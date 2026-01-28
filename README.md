@@ -79,10 +79,12 @@ All matches are _just known pattern matches_, not conclusions. The tool is an ai
 
 ## Installation
 
-Install via PyPi with `pip`, `pipx`, or 'uv'.
+The PyPi project for Spell Hunter is a work in progress, currently there are some wheels for Linux up.
+
+Currently installation is working best with `pip`:
 
 ```
-uv add spell_hunter
+pip install spell_hunter
 ```
 
 Alternatively, compile the wheel from source and install the wheel directly.
