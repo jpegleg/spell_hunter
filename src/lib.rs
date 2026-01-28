@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 
 #[allow(dead_code)]
 #[pymodule]
-mod py_hunter {
+mod spell_hunter {
     use chrono::Utc;
     use pyo3::prelude::*;
     use std::error::Error;
