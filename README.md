@@ -358,3 +358,39 @@ if __name__ == "__main__":
     main()
 
 ```
+
+Then when running our latest example, we can get output like this:
+
+```
+.venv/bin/python3.13 main.py /bin/uptime /bin/bash /bin/sh /usr/local/bin/enchant /usr/bin/X /usr/bin/clang /usr/bin/apt-mark /bin/firefox-esr /bin/curl
+2026-01-28 04:10:39.258996 b7fa84a5-e4b1-4567-9e5b-1c1b7618379b  hunter-demo: inserting  /bin/uptime
+2026-01-28 04:10:39.480018 3988f2da-873c-4bd8-ae49-9669fda60c29  hunter-demo: inserting  /bin/bash
+2026-01-28 04:10:39.655655 93a7d7e8-8444-4de6-96de-028173acaf24  hunter-demo: inserting  /bin/sh
+2026-01-28 04:10:39.802700 2b1144d7-ae9e-4acc-ac96-adcd5e91ca19  hunter-demo: inserting  /usr/local/bin/enchant
+2026-01-28 04:10:39.841773 a3e32fc7-444f-41fb-848d-93d0c88aac57  hunter-demo: inserting  /usr/bin/X
+2026-01-28 04:10:39.904944 83f43ccd-03c8-4e53-ab48-84aa54541759  hunter-demo: inserting  /usr/bin/clang
+2026-01-28 04:10:39.951992 66e1e999-6c4f-49d1-a8c0-0b11386278cd  hunter-demo: inserting  /usr/bin/apt-mark
+2026-01-28 04:10:40.078290 7c128646-616e-4975-9dab-6bca19d0e02c  hunter-demo: inserting  /bin/firefox-esr
+2026-01-28 04:10:40.169208 a4bfc004-35e6-48ac-a6d6-da580ce6d98f  hunter-demo: inserting  /bin/curl
+Visualization saved to: hunter_patterns_visualization.png
+
+=== Summary ===
+First scan time: 2026-01-28 09:10:39.258927893 UTC
+Total files scanned: 9
+Unique patterns detected: 4
+
+Pattern frequency:
+  bin_sh_use: found in 3 file(s)
+  elf_magic: found in 8 file(s)
+  gzip_magic: found in 1 file(s)
+  pe_magic: found in 1 file(s)
+2026-01-28 04:10:41.187847 a4bfc004-35e6-48ac-a6d6-da580ce6d98f  hunter-demo: The DB CONNection is now closed.
+```
+
+And then we can open the image file and use it in a report or investigation.
+
+```
+open hunter_patterns_visualization.png
+```
+
+The sqlite database file could of course also then be saved for later use.
