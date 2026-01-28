@@ -280,7 +280,10 @@ def insertstat(TXID, FILE):
         print(TIMESTAMP, TXID, " hunter-demo: Failed to insert into hunter.db FILE table:", error)
 
 def main():
-    os.remove('hunter.db')
+    try:
+        os.remove('hunter.db')
+    except OSError:
+        pass
     global CONN
     global C
     CONN = sqlite3.connect('hunter.db')
