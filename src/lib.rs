@@ -833,8 +833,10 @@ mod spell_hunter {
         Ok(json)
     }
 
-    #[pyfunction]
     pub fn hunt(file_path: &str) -> PyResult<String> {
-        Ok(search_patterns(file_path, &Interesting::all()).unwrap().to_string())
+        match search_patterns(file_path, &Interesting::all()) {
+            Ok(pattern) => Ok(pattern.to_string()),
+            _ => Ok("{ \"ERROR\": \"Invalid input\" }".to_string())
+        }
     }
 }
