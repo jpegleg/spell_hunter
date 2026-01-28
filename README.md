@@ -10,7 +10,7 @@ The patterns that Spell Hunter is searching for are various bytes that might be 
 patterns related to software exploits, vulnerabilities, malware, as well as useful items for reverse engineering.
 
 There is a singular function named "hunt" in this module that searches a given file for all of the "interesting" bytes,
-outputing a JSON with the file name, UTC time, along with any patterns matched and the byte positions in the file of those patterns.
+outputing JSON with the file name, UTC time, along with any patterns matched and the byte positions in the file of those patterns.
 
 An example ELF file will have the "elf_magic" pattern found:
 
@@ -139,5 +139,222 @@ When we execute this latest example, we get output like this:
 {'File': '/bin/bash', 'Report time': '2026-01-28 05:59:06.643373702 UTC', 'Matched patterns': [{'Pattern name': 'elf_magic', 'Byte offset': [0]}, {'Pattern name': 'bin_sh_use', 'Byte offset': [204386, 204545]}]}
 {'File': '/bin/sh', 'Report time': '2026-01-28 05:59:06.722365909 UTC', 'Matched patterns': [{'Pattern name': 'elf_magic', 'Byte offset': [0]}, {'Pattern name': 'bin_sh_use', 'Byte offset': [98562]}]}
 {'File': '/usr/local/bin/enchant', 'Report time': '2026-01-28 05:59:07.038956316 UTC', 'Matched patterns': [{'Pattern name': 'elf_magic', 'Byte offset': [0, 98913]}]}
+
+```
+
+Let's use another variation, this time keeping the output as the original JSON for each argument file:
+
+```
+import spell_hunter
+import json
+import sys
+
+def main():
+    for arg in sys.argv[1:]:
+        print(spell_hunter.hunt(arg))
+
+if __name__ == "__main__":
+    main()
+
+```
+
+And when we run that:
+
+```
+.venv/bin/python3.13 main.py /bin/uptime /bin/bash /bin/sh /usr/local/bin/enchant
+{
+  "File": "/bin/uptime",
+  "Report time": "2026-01-28 07:41:14.917662092 UTC",
+  "Matched patterns": [
+    {
+      "Pattern name": "elf_magic",
+      "Byte offset": [0]
+    }
+  ]
+}
+{
+  "File": "/bin/bash",
+  "Report time": "2026-01-28 07:41:15.098475373 UTC",
+  "Matched patterns": [
+    {
+      "Pattern name": "elf_magic",
+      "Byte offset": [0]
+    },
+    {
+      "Pattern name": "bin_sh_use",
+      "Byte offset": [204386, 204545]
+    }
+  ]
+}
+{
+  "File": "/bin/sh",
+  "Report time": "2026-01-28 07:41:15.119242895 UTC",
+  "Matched patterns": [
+    {
+      "Pattern name": "elf_magic",
+      "Byte offset": [0]
+    },
+    {
+      "Pattern name": "bin_sh_use",
+      "Byte offset": [98562]
+    }
+  ]
+}
+{
+  "File": "/usr/local/bin/enchant",
+  "Report time": "2026-01-28 07:41:15.187756273 UTC",
+  "Matched patterns": [
+    {
+      "Pattern name": "elf_magic",
+      "Byte offset": [0, 98913]
+    }
+  ]
+}
+```
+
+If we send invalid input to the hunt function, we'll get back JSON with an error:
+
+```
+.venv/bin/python3.13 main.py /bin/uptime -1
+{
+  "File": "/bin/uptime",
+  "Report time": "2026-01-28 07:37:59.756211114 UTC",
+  "Matched patterns": [
+    {
+      "Pattern name": "elf_magic",
+      "Byte offset": [0]
+    }
+  ]
+}
+{ "ERROR": "Invalid input" }
+```
+
+Rather than just printing out JSON like that, we more likely would want to write out to files or do something fancier with the data.
+
+Let's illustrate a more complex example with storing the data in sqlite and creating a report visualizing the files.
+
+```
+import spell_hunter
+import sqlite3
+import uuid
+from datetime import datetime
+from functools import reduce
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from collections import defaultdict
+import numpy as np
+import json
+import sys
+import os
+
+def timeslice():
+    global TIMESTAMP
+    TIMESTAMP = datetime.now()
+    return(TIMESTAMP)
+
+def createtable():
+    C.execute('''CREATE TABLE hunter
+                        (TIME text, FILE text, PATTERNS text)''')
+def hunting(FILE):
+    h = json.loads(spell_hunter.hunt(FILE))
+    global TIME
+    TIME = h['Report time']
+    global PATTERNS
+    PATTERNS = json.dumps(h['Matched patterns'])
+    #print(json.dumps(h['Matched patterns']))
+
+def insertstat(TXID, FILE):
+    try:
+        sqlite_insert_with_param = """INSERT INTO hunter
+                                            (TIME, FILE, PATTERNS)
+                                            VALUES (?, ?, ?);"""
+        hunting(FILE)
+        TIMESTAMP = timeslice()
+        timeslice()
+        print(TIMESTAMP, TXID, " hunter-demo: inserting ", FILE)
+        data_tuple = (TIME, FILE, PATTERNS)
+        C.execute(sqlite_insert_with_param, data_tuple)
+        CONN.commit()
+    except sqlite3.Error as error:
+        timeslice()
+        print(TIMESTAMP, TXID, " hunter-demo: Failed to insert into hunter.db FILE table:", error)
+
+def main():
+    os.remove('hunter.db')
+    global CONN
+    global C
+    CONN = sqlite3.connect('hunter.db')
+    C = CONN.cursor()
+    createtable()
+
+    for arg in sys.argv[1:]:
+        #print(json.loads(spell_hunter.hunt(arg)))
+        #print(spell_hunter.hunt(arg))
+        global TXID
+        TXID = uuid.uuid4()
+        insertstat(TXID, arg)
+
+    C.execute("SELECT TIME, FILE, PATTERNS FROM hunter")
+    rows = C.fetchall()
+    first_timestamp = rows[0][0] if rows else "No data"
+    file_patterns = defaultdict(set)
+
+    for time, file_path, patterns_json in rows:
+        patterns = json.loads(patterns_json)
+        file_name = file_path.split('/')[-1]
+
+        for pattern_dict in patterns:
+            pattern_name = pattern_dict.get("Pattern name")
+            if pattern_name:
+                file_patterns[file_name].add(pattern_name)
+
+    all_patterns = sorted(set(pattern for patterns in file_patterns.values() for pattern in patterns))
+    all_files = sorted(file_patterns.keys())
+    matrix = np.zeros((len(all_files), len(all_patterns)))
+
+    for i, file_name in enumerate(all_files):
+        for j, pattern in enumerate(all_patterns):
+            if pattern in file_patterns[file_name]:
+                matrix[i][j] = 1
+    fig, ax = plt.subplots(figsize=(max(12, len(all_patterns) * 0.8), max(8, len(all_files) * 0.5)))
+    cax = ax.imshow(matrix, cmap='YlOrRd', aspect='auto', interpolation='nearest')
+    ax.set_xticks(np.arange(len(all_patterns)))
+    ax.set_yticks(np.arange(len(all_files)))
+    ax.set_xticklabels(all_patterns, rotation=45, ha='right', fontsize=9)
+    ax.set_yticklabels(all_files, fontsize=9)
+    ax.set_xticks(np.arange(len(all_patterns)) - 0.5, minor=True)
+    ax.set_yticks(np.arange(len(all_files)) - 0.5, minor=True)
+    ax.grid(which='minor', color='gray', linestyle='-', linewidth=0.5)
+    ax.set_xlabel('Pattern Names', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Files', fontsize=12, fontweight='bold')
+    ax.set_title('Pattern Detection Across Files', fontsize=14, fontweight='bold', pad=20)
+    info_text = f'First Scan Time: {first_timestamp}\nTotal Files: {len(all_files)}\nUnique Patterns: {len(all_patterns)}'
+    props = dict(boxstyle='round', facecolor='lightblue', alpha=0.8)
+    ax.text(0.02, 0.98, info_text, transform=fig.transFigure, fontsize=10,
+            verticalalignment='top', bbox=props)
+    cbar = plt.colorbar(cax, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_ticks([0, 1])
+    cbar.set_ticklabels(['Not Found', 'Found'])
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    output_path = 'hunter_patterns_visualization.png'
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    print(f"Visualization saved to: {output_path}")
+    print(f"\n=== Summary ===")
+    print(f"First scan time: {first_timestamp}")
+    print(f"Total files scanned: {len(all_files)}")
+    print(f"Unique patterns detected: {len(all_patterns)}")
+    print(f"\nPattern frequency:")
+    for pattern in all_patterns:
+        count = sum(1 for file_patterns_set in file_patterns.values() if pattern in file_patterns_set)
+        print(f"  {pattern}: found in {count} file(s)")
+
+    if (CONN):
+        CONN.close()
+        timeslice()
+        print(TIMESTAMP, TXID, " hunter-demo: The DB CONNection is now closed.")
+
+
+if __name__ == "__main__":
+    main()
 
 ```
