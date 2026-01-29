@@ -79,12 +79,16 @@ All matches are _just known pattern matches_, not conclusions. The tool is an ai
 
 ## Installation
 
-The PyPi project for Spell Hunter is a work in progress, currently there are some wheels for Linux up.
-
-Currently installation is working best with `pip`:
+Install with `pip`:
 
 ```
 pip install spell_hunter
+```
+
+Or `uv`:
+
+```
+uv add spell_hunter
 ```
 
 Alternatively, compile the wheel from source and install the wheel directly.
@@ -293,8 +297,6 @@ def main():
     createtable()
 
     for arg in sys.argv[1:]:
-        #print(json.loads(spell_hunter.hunt(arg)))
-        #print(spell_hunter.hunt(arg))
         global TXID
         TXID = uuid.uuid4()
         insertstat(TXID, arg)
